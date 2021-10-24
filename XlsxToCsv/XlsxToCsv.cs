@@ -8,27 +8,33 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Collections.Specialized;
+using NLog;
+using System.Diagnostics;
 
 namespace XlsxToCsv
 {
+
     class XlsxToCsv
     {
+        private static Logger logger = LogManager.GetCurrentClassLogger();
         static void Main(string[] args)
         {
             if (args.Length != 1)
             {
-                System.Console.WriteLine("XlsxToCsv v.0.1");
-                System.Console.WriteLine("Usage: XlsxToCsv.exe filename.xlsx");
+                logger.Info("XlsxToCsv v.0.1");
+                logger.Info("Usage: XlsxToCsv.exe filename.xlsx");
             }
             else
             {
-                new XlsxToCsv(args[0]);
+                _ = new XlsxToCsv(args[0]);
+                if (Debugger.IsAttached) //only pause exit if running from IDE.
+                    System.Console.ReadLine();
             }
         }
 
         public XlsxToCsv(string filename)
         {
-            System.Console.WriteLine("Reading {0}...",filename);
+            logger.Info("Reading {0}...",filename);
             ReadExcelFile(filename);
         }
 
@@ -37,10 +43,14 @@ namespace XlsxToCsv
             string sDelimiter = ConfigurationManager.AppSettings.Get("Delimiter");
             string sQualifier = (ConfigurationManager.AppSettings.Get("UseTextQualifier") == "0" ? "" : "\"");
             Boolean bOverwrite = (ConfigurationManager.AppSettings.Get("OverwriteCSV") == "1");
-            System.Console.WriteLine("Using Qualifier: {0}",(sQualifier != ""));
-            System.Console.WriteLine("Using Delimiter: {0}",sDelimiter);
-            System.Console.WriteLine("Overwriting CSV: {0}",bOverwrite);
-            System.Console.WriteLine("Found dataset with {0} table(s) and {1} rows",dsExcelData.Tables.Count, dsExcelData.Tables[0].Rows.Count);
+            string sOverwriteMessage = String.Format("Overwriting CSV: {0}", bOverwrite);
+            logger.Info("Using Qualifier: {0}",(sQualifier != ""));
+            logger.Info("Using Delimiter: {0}",sDelimiter);
+            if (bOverwrite)
+                logger.Warn(sOverwriteMessage);
+            else
+                logger.Info(sOverwriteMessage);
+            logger.Info("Found dataset with {0} table(s) and {1} rows",dsExcelData.Tables.Count, dsExcelData.Tables[0].Rows.Count);
             StringBuilder content = new StringBuilder();
             if (dsExcelData.Tables.Count >= 1)
             {
@@ -76,7 +86,7 @@ namespace XlsxToCsv
                                     strRow += sDelimiter;
                             }
                             content.Append(strRow + "\r\n");
-                            System.Console.WriteLine(strRow);
+                            logger.Trace(strRow);
                             writer.WriteLine(strRow);
                         }
 
@@ -86,7 +96,7 @@ namespace XlsxToCsv
                 }
                 catch (IOException e)
                 {
-                    System.Console.WriteLine("ERROR: " + e.Message);
+                    logger.Error("ERROR: " + e.Message);
                 }
             }
             return true;
@@ -100,20 +110,20 @@ namespace XlsxToCsv
                 {
                     using (var reader = ExcelReaderFactory.CreateReader(stream))
                     {
-                        System.Console.WriteLine("Found {0} rows and {1} columns on sheet '{2}'",
+                        logger.Info("Found {0} rows and {1} columns on sheet '{2}'",
                             reader.RowCount, reader.FieldCount, reader.Name);
-                        System.Console.WriteLine("Reading data from workbook...");
+                        logger.Info("Reading data from workbook...");
                         WriteCsvFile(reader.AsDataSet(),filename);
                     }
                 }
             }
             catch (IOException e)
             {
-                System.Console.WriteLine("ERROR: File not found!");
+                logger.Error("ERROR: {0}!",e.Message);
             }
             catch (Exception e)
             {
-                System.Console.WriteLine("Error occurred: {0}", e.Message);
+                logger.Error("Error occurred: {0}", e.Message);
             }
             return true;
         }
